@@ -66,7 +66,8 @@ eggs/
 experiments/*
 
 # sandpit
-sandpit/
+sandpit/*
+!sandpit/test.py
 
 # meetings
 meetings/
