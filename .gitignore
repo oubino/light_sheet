@@ -67,7 +67,19 @@ experiments/*
 
 # sandpit
 sandpit/*
-!sandpit/test.py
 
 # meetings
 meetings/
+
+# cellpose
+cellpose/
+
+# dask
+*_distributed_cellpose
+dask_worker_logs_*
+
+# output
+output/
+
+# usegment3d
+usegment3d/
