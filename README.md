@@ -7,21 +7,17 @@ pip install bioio bioio-ome-tiff bioio-czi bioio-ome-zarr
 pip install "napari[all]"
 pip install matplotlib
 pip install torch --index-url https://download.pytorch.org/whl/cu126
-pip install git+https://www.github.com/mouseland/cellpose.git
 pip install dask-image dask-jobqueue
-
 pip install "bokeh>=3.1.0"
 
 pip install edt
 -- I had to install visual studio tools: https://visualstudio.microsoft.com/visual-cpp-build-tools/
 pip install u-Segment3D
 
-git clone https://github.com/MouseLand/cellpose.git
-cd cellpose
-pip install -e .
+pip install cellpose[gui]
 
-
-pip install PyQt6
+# You may need to install these...
+pip install PyQt6 
 pip install pyqtgraph
 
 ## Set-up
@@ -81,19 +77,17 @@ pip install pyqtgraph
     python scripts/analyse_cells.py
     ```
 
-## To do
+## Remaining issues....
 
-1. Amend segment3d script
-    - take in the trained model
-    - do for each tile? or tile a whole box?
-    - compare with original script to see how has changed...
+1. Initial training with CellSAM through Cellpose GUI, it was struggling to annotate the cells... therefore:
+    a. Is cellpose the right architecture for these cells
+    b. Does it just need further training
+    c. Model = cyto2 seemed to work well initially, so could we retrain this model instead
 
-1. Which version/fork of cellpose to install
+2. Segment3d script amendment
+    a. needs to be amended to take in the trained model from 2D training by changing the path to the model to be the custom trained tmodel
+    b. need to work out how to do for a whole FOV... could either tile across the whole FOV or just apply to each of the pre-selected tiles/areas from before?
+
 2. Which version/fork of u-Segment3D to install
-3. Commit cellpose changes
 4. Commit light sheet changes
-5. Commit unet3d changes
-6. Change how to install instructions
-7. Test run the whole thing
 8. Prepare handover incl. how to run on AIRE?
-9. Flag issue that usegment3d not 3d compatible
