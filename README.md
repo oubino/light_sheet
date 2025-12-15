@@ -87,3 +87,5 @@ pip install pyqtgraph
 2. Segment3d script amendment
     a. needs to be amended to take in the trained model from 2D training by changing the path to the model to be the custom trained tmodel
     b. need to work out how to do for a whole FOV... could either tile across the whole FOV or just apply to each of the pre-selected tiles/areas from before?
+
+3. U-Segment3D requires Cellpose 3.0... but Cellpose now at version 4.0... so need to decide how to deal with this
