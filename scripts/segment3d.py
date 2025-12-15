@@ -82,9 +82,12 @@ if __name__=="__main__":
     """
     
     ### Parameters ###
-    test_crop = True
-    
-    
+    imgfile = 'output/zarr/ScanA_30-Lattice Lightsheet-04.zarr'
+    cellsize = 150
+    memb_channel = 0
+    cellpose_model = "cpsam"
+    box_crop = True
+
     # =============================================================================
     #     0. Read the image data
     # =============================================================================
@@ -108,16 +111,27 @@ if __name__=="__main__":
     """
     There are two channels. There is spectral overlap. and signal needs to be enhanced for segmentation. 
     """
-    imgfile = 'TEST.zarr'
     store = zarr.open(imgfile)
     img = store['0']
     img = da.from_zarr(img)
+
+    if box_crop:
+        
+        boxes_file = os.listdir(f"output/boxes")[0]
+        boxes_file = f"output/boxes/{boxes_file}"
+        b = np.load(boxes_file)[0]
+
+        ymin = int(b[:,2].min())
+        ymax = int(b[:,2].max())
+        xmin = int(b[:,3].min())
+        xmax = int(b[:,3].max())
+        
+        img = img[:, :, ymin:ymax, xmin:xmax]
 
     # setup a save folder for this example.
     # 1. create a save folder 
     savecellfolder = os.path.join('output/3d_segment')
     uSegment3D_fio.mkdir(savecellfolder)
-    
     
     """
     Visualize the image in max projection and mid-slice to get an idea of how it looks
@@ -148,11 +162,11 @@ if __name__=="__main__":
     #     0. Custom Preprocess of the image channels. 
     # =============================================================================
  
-    chan0_img = img[0,:].compute()
-    chan1_img = img[1,:].compute()
+    im_chan0 = img[0,:].compute()
+    im_chan1 = img[1,:].compute()
     
-    chan0_img = uSegment3D_filters.normalize(chan0_img, pmin=2, pmax=99.8, clip=True)
-    chan1_img = uSegment3D_filters.normalize(chan1_img, pmin=2, pmax=99.8, clip=True)
+    im_chan0 = uSegment3D_filters.normalize(im_chan0, pmin=2, pmax=99.8, clip=True)
+    im_chan1 = uSegment3D_filters.normalize(im_chan1, pmin=2, pmax=99.8, clip=True)
 
     """
     do background correction subtractively. 
@@ -160,100 +174,100 @@ if __name__=="__main__":
     bg_ds = 5 
 
     # estimate background
-    im_chan0_bg = uSegment3D_filters.smooth_vol(chan0_img, ds=bg_ds, smooth=5)
-    im_chan1_bg = uSegment3D_filters.smooth_vol(chan1_img, ds=bg_ds, smooth=5)
+    im_chan0_bg = uSegment3D_filters.smooth_vol(im_chan0, ds=bg_ds, smooth=5)
+    im_chan1_bg = uSegment3D_filters.smooth_vol(im_chan1, ds=bg_ds, smooth=5)
     
     # debackground and renormalize
-    chan0_img = uSegment3D_filters.normalize(chan0_img-im_chan0_bg, pmin=2, pmax=99.8, clip=True)
-    chan1_img = uSegment3D_filters.normalize(chan1_img-im_chan1_bg, pmin=2, pmax=99.8, clip=True)
+    im_chan0 = uSegment3D_filters.normalize(im_chan0-im_chan0_bg, pmin=2, pmax=99.8, clip=True)
+    im_chan1 = uSegment3D_filters.normalize(im_chan1-im_chan1_bg, pmin=2, pmax=99.8, clip=True)
 
     
     plt.figure(figsize=(10,10))
     plt.subplot(131)
     plt.title('Chan0 Max. Projection after background subtract')
-    plt.imshow(chan0_img.max(axis=0), cmap='gray')
+    plt.imshow(im_chan0.max(axis=0), cmap='gray')
     plt.subplot(132)
-    plt.imshow(chan0_img.max(axis=1), cmap='gray')
+    plt.imshow(im_chan0.max(axis=1), cmap='gray')
     plt.subplot(133)
-    plt.imshow(chan0_img.max(axis=2), cmap='gray')
+    plt.imshow(im_chan0.max(axis=2), cmap='gray')
     plt.savefig(os.path.join(savecellfolder, 'bg-subtract_input_chan0_image_max-projection.png'), dpi=300, bbox_inches='tight')
     
     
     plt.figure(figsize=(10,10))
     plt.subplot(131)
     plt.title('Chan1 Max. Projection after background subtract')
-    plt.imshow(chan1_img.max(axis=0), cmap='gray')
+    plt.imshow(im_chan1.max(axis=0), cmap='gray')
     plt.subplot(132)
-    plt.imshow(chan1_img.max(axis=1), cmap='gray')
+    plt.imshow(im_chan1.max(axis=1), cmap='gray')
     plt.subplot(133)
-    plt.imshow(chan1_img.max(axis=2), cmap='gray')
+    plt.imshow(im_chan1.max(axis=2), cmap='gray')
     plt.savefig(os.path.join(savecellfolder, 'bg-subtract_input_chan1_image_max-projection.png'), dpi=300, bbox_inches='tight')
 
     """
     Read the synthetic PSF to perform deconvolution enhancement. This PSF can be generally used with lightsheet microscopes
     """
-    import scipy.io as spio 
+    #import scipy.io as spio 
+    #
+    #psf_meSPIM = 'PSFs/meSPIM_PSF_kernel.mat'
+    #psf_meSPIM = spio.loadmat(psf_meSPIM)['PSF']
+    #psf_meSPIM = psf_meSPIM / (float(np.sum(psf_meSPIM))) # normalize the PSF. 
     
-    psf_meSPIM = 'PSFs/meSPIM_PSF_kernel.mat'
-    psf_meSPIM = spio.loadmat(psf_meSPIM)['PSF']
-    psf_meSPIM = psf_meSPIM / (float(np.sum(psf_meSPIM))) # normalize the PSF. 
+    #import skimage.restoration as skrestoration 
     
-    import skimage.restoration as skrestoration 
-    
-    im_chan0_deconv = skrestoration.wiener(chan0_img, psf_meSPIM, balance=0.1) # was doing balance=0.5 # use a smaller balance to retain sharper features. 
-    im_chan0_deconv = np.clip(im_chan0_deconv, 0, 1) 
-    im_chan0_deconv = np.array([ uSegment3D_filters.anisodiff(ss, niter=15,kappa=1,gamma=0.1,step=(1.,1.),sigma=0, option=1,ploton=False) for ss in im_chan0_deconv]) 
-    
-    
-    im_chan1_deconv = skrestoration.wiener(chan1_img, psf_meSPIM, balance=0.1) # was doing balance=0.5 # use a smaller balance to retain sharper features. 
-    im_chan1_deconv = np.clip(im_chan1_deconv, 0, 1) 
-    im_chan1_deconv = np.array([ uSegment3D_filters.anisodiff(ss, niter=15,kappa=1,gamma=0.1,step=(1.,1.),sigma=0, option=1,ploton=False) for ss in im_chan1_deconv]) 
-    
-    
-    plt.figure(figsize=(10,10))
-    plt.subplot(131)
-    plt.title('chan0 Max. Projection after deconv, background subtract')
-    plt.imshow(im_chan0_deconv.max(axis=0), cmap='gray')
-    plt.subplot(132)
-    plt.imshow(im_chan0_deconv.max(axis=1), cmap='gray')
-    plt.subplot(133)
-    plt.imshow(im_chan0_deconv.max(axis=2), cmap='gray')
-    plt.savefig(os.path.join(savecellfolder,
-                             'deconv_bg-subtract_input_chan0_image_max-projection.png'), dpi=300, bbox_inches='tight')
+    #im_chan0 = skrestoration.wiener(im_chan0, psf_meSPIM, balance=0.1) # was doing balance=0.5 # use a smaller balance to retain sharper features. 
+    #im_chan0 = np.clip(im_chan0, 0, 1) 
+    #im_chan0 = np.array([ uSegment3D_filters.anisodiff(ss, niter=15,kappa=1,gamma=0.1,step=(1.,1.),sigma=0, option=1,ploton=False) for ss in im_chan0]) 
+    #
+    #
+    #im_chan1 = skrestoration.wiener(im_chan1, psf_meSPIM, balance=0.1) # was doing balance=0.5 # use a smaller balance to retain sharper features. 
+    #im_chan1 = np.clip(im_chan1, 0, 1) 
+    #im_chan1 = np.array([ uSegment3D_filters.anisodiff(ss, niter=15,kappa=1,gamma=0.1,step=(1.,1.),sigma=0, option=1,ploton=False) for ss in im_chan1]) 
+    #
+    #
+    #plt.figure(figsize=(10,10))
+    #plt.subplot(131)
+    #plt.title('chan0 Max. Projection after deconv, background subtract')
+    #plt.imshow(im_chan0.max(axis=0), cmap='gray')
+    #plt.subplot(132)
+    #plt.imshow(im_chan0.max(axis=1), cmap='gray')
+    #plt.subplot(133)
+    #plt.imshow(im_chan0.max(axis=2), cmap='gray')
+    #plt.savefig(os.path.join(savecellfolder,
+    #                         'deconv_bg-subtract_input_chan0_image_max-projection.png'), dpi=300, bbox_inches='tight')
     #plt.show(block=False)
     
     
-    plt.figure(figsize=(10,10))
-    plt.subplot(131)
-    plt.title('chan1 Max. Projection after deconv, background subtract')
-    plt.imshow(im_chan1_deconv.max(axis=0), cmap='gray')
-    plt.subplot(132)
-    plt.imshow(im_chan1_deconv.max(axis=1), cmap='gray')
-    plt.subplot(133)
-    plt.imshow(im_chan1_deconv.max(axis=2), cmap='gray')
-    plt.savefig(os.path.join(savecellfolder,
-                             'deconv_bg-subtract_input_chan1_image_max-projection.png'), dpi=300, bbox_inches='tight')
+    #plt.figure(figsize=(10,10))
+    #plt.subplot(131)
+    #plt.title('chan1 Max. Projection after deconv, background subtract')
+    #plt.imshow(im_chan1.max(axis=0), cmap='gray')
+    #plt.subplot(132)
+    #plt.imshow(im_chan1.max(axis=1), cmap='gray')
+    #plt.subplot(133)
+    #plt.imshow(im_chan1.max(axis=2), cmap='gray')
+    #plt.savefig(os.path.join(savecellfolder,
+    #                         'deconv_bg-subtract_input_chan1_image_max-projection.png'), dpi=300, bbox_inches='tight')
 
     """
     Perform a non-negative matrix factorization spectral unmixing. 
     """
-    im_unmix = demix_videos(im_chan0_deconv, 
-                            im_chan1_deconv, 
+    im_unmix = demix_videos(im_chan0, 
+                            im_chan1, 
                             l1_ratio=0.5)
     
     # rescale. 
-    im_chan0_deconv = uSegment3D_filters.normalize(im_unmix[...,0], clip=True)
-    im_chan1_deconv = uSegment3D_filters.normalize(im_unmix[...,1], clip=True)
+    im_chan0 = uSegment3D_filters.normalize(im_unmix[...,0], clip=True)
+    im_chan1 = uSegment3D_filters.normalize(im_unmix[...,1], clip=True)
     
     
     plt.figure(figsize=(10,10))
     plt.subplot(131)
     plt.title('chan0 Max. Projection after unmix, deconv, background subtract')
-    plt.imshow(im_chan0_deconv.max(axis=0), cmap='gray')
+    plt.imshow(im_chan0.max(axis=0), cmap='gray')
     plt.subplot(132)
-    plt.imshow(im_chan0_deconv.max(axis=1), cmap='gray')
+    plt.imshow(im_chan0.max(axis=1), cmap='gray')
     plt.subplot(133)
-    plt.imshow(im_chan0_deconv.max(axis=2), cmap='gray')
+    plt.imshow(im_chan0.max(axis=2), cmap='gray')
     plt.savefig(os.path.join(savecellfolder,
                              'unmix_deconv_bg-subtract_input_chan0_image_max-projection.png'), dpi=300, bbox_inches='tight')
     #plt.show(block=False)
@@ -262,16 +276,19 @@ if __name__=="__main__":
     plt.figure(figsize=(10,10))
     plt.subplot(131)
     plt.title('chan1 Max. Projection after unmix, deconv, background subtract')
-    plt.imshow(im_chan1_deconv.max(axis=0), cmap='gray')
+    plt.imshow(im_chan1.max(axis=0), cmap='gray')
     plt.subplot(132)
-    plt.imshow(im_chan1_deconv.max(axis=1), cmap='gray')
+    plt.imshow(im_chan1.max(axis=1), cmap='gray')
     plt.subplot(133)
-    plt.imshow(im_chan1_deconv.max(axis=2), cmap='gray')
+    plt.imshow(im_chan1.max(axis=2), cmap='gray')
     plt.savefig(os.path.join(savecellfolder,
                              'unmix_deconv_bg-subtract_input_chan1_image_max-projection.png'), dpi=300, bbox_inches='tight')
     
     
-    img_preprocess = np.stack([im_chan0_deconv, im_chan1_deconv], axis=-1).copy()
+    img_preprocess = np.stack([im_chan0, im_chan1], axis=-1).copy()
+
+    # get membrane channel
+    img_preprocess = img_preprocess[..., memb_channel]
    
     # =============================================================================
     #     2. Run Cellpose 2D in xy, xz, yz with auto-tuning diameter to get cell probability and gradients, in all 3 views. 
@@ -292,13 +309,13 @@ if __name__=="__main__":
     # ctyo2 > cyto3
     # cellpose_segment_params['cellpose_modelname'] = 'cyto' # try different models like 'cyto', 'cyto3' for cells, and additionally 'nuclei' for nuclei
     #cellpose_segment_params['cellpose_modelname'] = 'cyto2' # try different models like 'cyto', 'cyto3' for cells, and additionally 'nuclei' for nuclei
-    cellpose_segment_params['cellpose_modelname'] = 'ctyo2' # seems to be best model? 
+    cellpose_segment_params['cellpose_modelname'] = cellpose_model # seems to be best model? 
     cellpose_segment_params['cellpose_version'] = 4.0
 
     """
     If the below auto-inferred diameter is picking up noise and being too small, we can increase the default ksize, alternatively we can add median_filter.
     """
-    cellpose_segment_params['ksize'] = 21
+    cellpose_segment_params['ksize'] = cellsize
     
     # invert model
     cellpose_segment_params['model_invert'] = False

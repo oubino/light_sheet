@@ -54,13 +54,14 @@ def main(argv=None):
             for x, y, z in zip(xs, ys, zs):
 
                 # generate 2d view of the data
-                tile = img[:,z, y:y+img_size, x:x+img_size]
+                # ignore nuclear channel....
+                tile = img[0, z, y:y+img_size, x:x+img_size]
 
                 # save as .tif to cellpose folder
                 OmeTiffWriter.save(
                     tile,
                     f"output/cellpose/{f_name}_2Dtile_xyz_{x}_{y}_{z}.tif",
-                    dim_order="CYX",
+                    dim_order="YX",
                 )  
        
 

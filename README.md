@@ -26,6 +26,11 @@ pip install pyqtgraph
 
 2. Move your .czi data into the data/ folder
 
+## Note
+
+1. Ignore nucleus channel
+2. Only apply to small window of original img
+
 
 ## Workflow
 
@@ -83,9 +88,12 @@ pip install pyqtgraph
     a. Is cellpose the right architecture for these cells
     b. Does it just need further training
     c. Model = cyto2 seemed to work well initially, so could we retrain this model instead
+    d. Think excluding nuclear channel is helping a lot
 
 2. Segment3d script amendment
     a. needs to be amended to take in the trained model from 2D training by changing the path to the model to be the custom trained tmodel
     b. need to work out how to do for a whole FOV... could either tile across the whole FOV or just apply to each of the pre-selected tiles/areas from before?
 
 3. U-Segment3D requires Cellpose 3.0... but Cellpose now at version 4.0... so need to decide how to deal with this
+
+4. Can run U-Segment3D with Cellpose 4.0 but is incredibly slow...
