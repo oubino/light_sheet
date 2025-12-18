@@ -3,21 +3,30 @@
 ## Environment
 
 conda create -n light_sheet python=3.11
+
 pip install bioio bioio-ome-tiff bioio-czi bioio-ome-zarr
+
 pip install "napari[all]"
+
 pip install matplotlib
+
 pip install torch --index-url https://download.pytorch.org/whl/cu126
+
 pip install dask-image dask-jobqueue
+
 pip install "bokeh>=3.1.0"
 
 pip install edt
+
 -- I had to install visual studio tools: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+
 pip install u-Segment3D
 
 pip install cellpose[gui]
 
 # You may need to install these...
 pip install PyQt6 
+
 pip install pyqtgraph
 
 ## Set-up
@@ -97,3 +106,4 @@ pip install pyqtgraph
 3. U-Segment3D requires Cellpose 3.0... but Cellpose now at version 4.0... so need to decide how to deal with this
 
 4. Can run U-Segment3D with Cellpose 4.0 but is incredibly slow...
+
